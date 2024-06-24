@@ -1,0 +1,117 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+<event name="cluster_encontrados" size="1"/>
+<event name="estado" size="1"/>
+<constant name="TIME_DETECT" value="2400"/>
+<constant name="TIME_ROTATE" value="5000"/>
+<constant name="UMB_CLUST" value="200"/>
+<constant name="UMB_OBST" value="4000"/>
+<constant name="VEL" value="200"/>
+
+
+<!--node Explorador1 en Lidi - 11024-->
+<node name="Explorador1 en Lidi - 11024" nodeId="{c8805643-eb3d-438b-bca9-f857cb9efde0}"><![CDATA[# Estado de la máquina de estados
+var state_recolecta=0
+var encontrados=0 #Numero de cluster encontrados (inicializado a 0)
+var random_turn=0	#Número aleatorio inicalizado a 0 
+timer.period[0]=0	#Periodo de tiempo inicializado a 0
+
+# Función para comprobar si el robot está dentro del clúster
+onevent prox
+	#OBSTÁCULOS
+	#Si hay uno delante (sensor 3) retrocedemos 
+	if prox.horizontal[3]> UMB_OBST then
+  		call leds.top(32,0,0)
+		motor.left.target = -VEL
+   		motor.right.target = -VEL
+   		
+	# Revisamos si hay un obstaculo detras (sensor 5 y 6)
+  	elseif prox.horizontal[5] > UMB_OBST or prox.horizontal[6] > UMB_OBST then
+  		call leds.top(32,0,0)
+    	# Nos alejamos de el avanzando hacia adelante (ambos positivos)
+    	motor.left.target = VEL
+   		motor.right.target = VEL
+    
+  	# Revisamos si hay un obstaculo a la derecha (sensor 3 y 4)
+ 	elseif prox.horizontal[3] > UMB_OBST or prox.horizontal[4] > UMB_OBST then
+ 		call leds.top(32,0,0)
+    	# Nos alejamos de el girando a la izquierda (izq negativo y der positivo)
+   		 motor.left.target = -500
+   		 motor.right.target = VEL
+    
+  	# Revisamos si hay un obstaculo a la izquierda (sensor 0 y 1)
+  	elseif prox.horizontal[1] > UMB_OBST or prox.horizontal[0]> UMB_OBST then
+  		call leds.top(32,0,0)
+    	# Nos alejamos de el girando a la derecha (izq positivo y der negativo)
+    	motor.left.target = VEL
+    	motor.right.target = -500
+    	
+    #Si no hay obstáculos llamamos a la función comprueba
+    else
+    	call leds.top(32,32,32)
+	    callsub comprueba
+	end        
+
+sub comprueba
+		#DETECCIÓN DE CLUSTER
+		if prox.ground.delta[0] < UMB_CLUST and prox.ground.delta[1] < UMB_CLUST then
+		 	call leds.top(0, 0, 32)  #Indicar con LEDs que se ha detectado un posible clúster
+		    #Si debe dar vueltas (state_recolecta=2)
+		 	if state_recolecta==2 then 
+		   			motor.left.target = VEL
+		     		motor.right.target = -VEL
+		    #Debe avanzar (state_recolecta=1)
+	   		elseif  state_recolecta==1 then #Avanza
+		   			motor.left.target = VEL
+		     		motor.right.target = VEL
+	        #Si aún no se ha iniciado la comprobación (state_recolecta=0)  
+	   		elseif state_recolecta== 0 	then
+	   		#Inicializamos el estado de avanzar junto con la inicialización del temporizador
+	            timer.period[0] = TIME_DETECT					
+	   			state_recolecta=1
+	         end
+	        
+	        #NO HAY DETECCIÓN DE CLUSTER 
+		    else
+	    		call leds.top(32,32,32) #Indicar con LEDs exploración
+	    		state_recolecta=0		#Inidicar que el estado es exploración
+	    		if random_turn>0 then
+	    			motor.left.target = VEL
+	            	motor.right.target = VEL/2
+	    		else
+	    			motor.left.target = VEL/2
+	            	motor.right.target = VEL
+	    		end
+        end
+     
+#Si se acabo el temporizador
+ onevent timer0
+ 	#Volvemos a calcular el valor aleatorio y emitimos el estado
+ 	call math.rand(random_turn)
+ 	emit estado(state_recolecta)
+	#Si ha terminado el temporizador y estaba avanzando le decimos que de vueltas
+	 if  state_recolecta==1 then
+	 	timer.period[0] = TIME_ROTATE #Inicializamos su temporizador correspondiente
+	 	state_recolecta=2
+	 #Si estaba dando vueltas y acabo el temporizador
+	 elseif  state_recolecta==2 then
+	 	#Si aún está encima del clúster, 
+	 	if prox.ground.delta[0] < UMB_CLUST and prox.ground.delta[1] < UMB_CLUST then
+	 		call leds.top(0,32,0)	#Indicamos con los leds que lo encontramos
+	 		encontrados=encontrados+1
+	 		emit cluster_encontrados(encontrados)	#Emitimos los que llevamos encontrados
+	 	end
+	 	#Reinicializamos tanto el temporizador como el estado
+	 	timer.period[0]=0
+	 	state_recolecta=0
+	 end
+	 
+
+
+]]></node>
+
+
+</network>

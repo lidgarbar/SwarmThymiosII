@@ -1,0 +1,82 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+
+
+<!--node Dispositivo serie USB-->
+<node name="Dispositivo serie USB" nodeId="{0513d492-3fe7-4c30-a907-246f62ecf569}"><![CDATA[var accTampon0[4] = 0, 0, 0, 0
+var accTamponPos0 = 0
+var accTampon1[4] = 0, 0, 0, 0
+var accTamponPos1 = 0
+var sumacc0
+var sumacc1
+
+var estado = 0  # Estado actual del movimiento: 0 = avanzar, 1 = retroceder
+var tiempo_avance = 100  # Tiempo en milisegundos para avanzar
+var tiempo_retroceso = 50  # Tiempo en milisegundos para retroceder
+var tiempo_transcurrido = 0  # Tiempo transcurrido desde el último cambio de estado
+
+onevent acc
+if prox.horizontal[3] > UMB_OBST then
+    call leds.top(32,0,0)
+    motor.left.target = -VEL
+    motor.right.target = -VEL
+
+  elseif prox.horizontal[5] > UMB_OBST or prox.horizontal[6] > UMB_OBST then
+    call leds.top(32,0,0)
+    motor.left.target = VEL
+    motor.right.target = VEL
+
+  elseif prox.horizontal[3] > UMB_OBST or prox.horizontal[4] > UMB_OBST then
+    call leds.top(32,0,0)
+    motor.left.target = -400
+    motor.right.target = VEL
+
+  elseif prox.horizontal[1] > UMB_OBST or prox.horizontal[0] > UMB_OBST then
+    call leds.top(32,0,0)
+    motor.left.target = VEL
+    motor.right.target = -400
+  else
+  	callsub volver
+  end
+  
+sub volver
+accTampon0[accTamponPos0] = acc[0]-2  # Medir inclinación lateral
+  accTamponPos0 = (accTamponPos0 + 1) % 4
+  sumacc0 = accTampon0[0] + accTampon0[1] + accTampon0[2] + accTampon0[3]
+
+  accTampon1[accTamponPos1] = acc[1]     # Medir inclinación frontal
+  accTamponPos1 = (accTamponPos1 + 1) % 4
+  sumacc1 = accTampon1[0] + accTampon1[1] + accTampon1[2] + accTampon1[3]
+
+  if estado == 0 then  # Avanzar
+    motor.left.target = sumacc0 * 15 + sumacc1 * 15
+    motor.right.target = -sumacc0 * 15 + sumacc1 * 15
+  elseif estado == 1 then  # Retroceder
+    motor.left.target = -sumacc0 * 15 - sumacc1 * 15
+    motor.right.target = sumacc0 * 15 - sumacc1 * 15
+  end
+
+  tiempo_transcurrido += 10  # Incrementar el tiempo transcurrido (10 ms por cada ciclo de evento)
+
+  # Cambiar de estado después del tiempo correspondiente
+  if estado == 0 and tiempo_transcurrido >= tiempo_avance then
+    estado = 1  # Cambiar a retroceso
+    tiempo_transcurrido = 0  # Reiniciar el contador de tiempo
+  elseif estado == 1 and tiempo_transcurrido >= tiempo_retroceso then
+    estado = 0  # Cambiar a avance
+    tiempo_transcurrido = 0  # Reiniciar el contador de tiempo
+    end]]></node>
+
+
+<!--node Dispositivo serie USB-->
+<node name="Dispositivo serie USB" nodeId="{00609102-e22c-4303-83ff-5a577abd53e7}"><![CDATA[]]></node>
+
+
+<!--node -->
+<node name=""><![CDATA[]]></node>
+
+
+</network>

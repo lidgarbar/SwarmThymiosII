@@ -1,0 +1,269 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+<event size="1" name="velocidadLider"/>
+
+
+<!--node -->
+<node name=""><![CDATA[#LIDER
+
+# Definimos el umbral de distancia con el obstaculo y con los demas robots
+var umbralObstaculo = 1500
+# Parametros de velocidad de aproximacion
+var velocidadAproximacion =200
+#Hacemos llamada al evento que hemos definido velocidadLider para que emita su velocidad al inicio
+emit velocidadLider(velocidadAproximacion)
+
+# Manejador de eventos para la deteccion de obstaculos y agrupamiento
+# Evitara obstaculos (OBSTACULOS) 
+onevent prox
+		call leds.top(32,32,32)
+	    #OBSTACULOS
+	  	# Revisamos si hay un obstaculo detras (sensor 5 y 6)
+	  	if prox.horizontal[5] > umbralObstaculo or prox.horizontal[6] >umbralObstaculo then
+	    	# Nos alejamos de el avanzando hacia adelante (ambos positivos)
+	    	motor.left.target = 300
+	   		motor.right.target = 300
+	    
+	  	# Revisamos si hay un obstaculo a la derecha (sensor 3 y 4)
+	 	elseif prox.horizontal[3] > umbralObstaculo or prox.horizontal[4] > umbralObstaculo then
+	    	# Nos alejamos de el girando a la izquierda (izq negativo y der positivo)
+	   		 motor.left.target = -500
+	   		 motor.right.target = 300
+	    
+	  	# Revisamos si hay un obstaculo a la izquierda (sensor 0 y 1)
+	  	elseif prox.horizontal[1] > umbralObstaculo or prox.horizontal[0]> umbralObstaculo then
+	    	# Nos alejamos de el girando a la derecha (izq positivo y der negativo)
+	    	motor.left.target = 300
+	    	motor.right.target = -500
+	    	
+	   #Sino sigue de frente
+	   	else
+		   	motor.left.target = velocidadAproximacion
+		    motor.right.target = velocidadAproximacion
+		  		  	
+	  	end
+    
+    ]]></node>
+
+
+<!--node -->
+<node name=""><![CDATA[#SEGUIDOR
+
+# Definimos el umbral de distancia con el obstaculo y con los demas robots
+var umbralObstaculo = 3500
+#Definimos el umbral por el cual se debe aproximar a otro robots
+var umbralAproximacion = 10
+#Definimos el umbral de la distancia a la que debe mantenerse el robot con los demas
+var umbralDistancia = 2000   
+# Parametros de velocidad de aproximacion
+var velocidadAproximacion =300
+#Definimos un margen de error en la distancia que se alcanza en la estabilidad
+var margen=100
+#La velocidadEstabilidad sera la que este emitiendo el lider con el evento definido
+var velocidadEstabilidad= event.args[0]
+#Creamos una variable donde guardar los valores maximo
+var maximo=0
+
+# Manejador de eventos para la deteccion de obstaculos y agrupamiento
+# Primero evitara obstaculos (OBSTACULOS) luego vera si debe mantenerse a una distancia con el lider (EQUILIBRIO) y por ultimo si debe acercarse (APROXIMACION)
+onevent prox
+		call leds.top(32,0,0)
+	  #OBSTACULOS
+	  	# Revisamos si hay un obstaculo detras (sensor 5 y 6)
+	  	if prox.horizontal[5] > umbralObstaculo or prox.horizontal[6] >umbralObstaculo then
+	    	# Nos alejamos de el avanzando hacia adelante (ambos positivos)
+	    	motor.left.target = 300
+	   		motor.right.target = 300
+	    
+	  	# Revisamos si hay un obstaculo a la derecha (sensor 3 y 4)
+	 	elseif prox.horizontal[3] > umbralObstaculo or prox.horizontal[4] > umbralObstaculo then
+	    	# Nos alejamos de el girando a la izquierda (izq negativo y der positivo)
+	   		 motor.left.target = -500
+	   		 motor.right.target = 300
+	    
+	  	# Revisamos si hay un obstaculo a la izquierda (sensor 0 y 1)
+	  	elseif prox.horizontal[1] > umbralObstaculo or prox.horizontal[0]> umbralObstaculo then
+	    	# Nos alejamos de el girando a la derecha (izq positivo y der negativo)
+	    	motor.left.target = 300
+	    	motor.right.target = -500
+	   	
+	   	else
+	   		call leds.top(0,32,0)
+			#ESTABILIDAD
+			#Distancia deseada delante (sensor 2)
+			if (umbralDistancia<=prox.horizontal[2]+margen and prox.horizontal[2]>=umbralDistancia+margen) then
+			    # Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    motor.left.target = velocidadEstabilidad - (prox.horizontal[2] - umbralDistancia)
+			    motor.right.target = velocidadEstabilidad - (prox.horizontal[2] - umbralDistancia)
+			 #*
+			 #Distancia deseada lado derecho 
+			 elseif  (umbralDistancia<=prox.horizontal[3]+margen and prox.horizontal[3]>=umbralDistancia+margen)or
+			 (umbralDistancia<=prox.horizontal[4]+margen and prox.horizontal[4]>=umbralDistancia+margen) then
+			 	#Miramos porque sensor esta mas cercano
+			 	call math.max(maximo,prox.horizontal[3],prox.horizontal[4])
+			    # Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    motor.left.target = velocidadEstabilidad - (maximo - umbralDistancia)
+			    motor.right.target = -velocidadEstabilidad - (maximo - umbralDistancia)
+			    
+			 #Distancia deseada lado izquiedo
+			 elseif  (umbralDistancia<=prox.horizontal[3]+margen and prox.horizontal[3]>=umbralDistancia+margen)or
+			 (umbralDistancia<=prox.horizontal[4]+margen and prox.horizontal[4]>=umbralDistancia+margen) then
+			 	 #Miramos porque sensor esta mas cercano
+			 	call math.max(maximo,prox.horizontal[0],prox.horizontal[1])
+			    # Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    motor.left.target = -velocidadEstabilidad - (maximo - umbralDistancia)
+			    motor.right.target = velocidadEstabilidad - (maximo - umbralDistancia)
+			*#
+		
+		    else
+	   			call leds.top(0,0,32)
+		        #APROXIMACION
+				#Robot delante (sensor 2)
+			  	if prox.horizontal[2] > umbralAproximacion then	    
+			    	# Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			   		motor.left.target = velocidadAproximacion - (prox.horizontal[2] - umbralDistancia)
+			    	motor.right.target = velocidadAproximacion - (prox.horizontal[2] - umbralDistancia)
+			    
+				#Robot derecha (sensor 3 y 4)
+			   	elseif prox.horizontal[3] > umbralAproximacion or prox.horizontal[4] > umbralAproximacion  then
+			    	#Miramos porque sensor esta mas cercano
+			 		call math.max(maximo,prox.horizontal[3],prox.horizontal[4])
+			    	# Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    	motor.left.target = velocidadAproximacion - (maximo - umbralDistancia)
+			    	motor.right.target = -velocidadAproximacion - (maximo - umbralDistancia)
+			    	
+				#Robot izquierda (sensor 0 y 1)
+			   	elseif prox.horizontal[0] > umbralAproximacion or prox.horizontal[1] > umbralAproximacion  then
+			 	 	#Miramos porque sensor esta mas cercano
+			 		call math.max(maximo,prox.horizontal[0],prox.horizontal[1])
+			    	# Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    	motor.left.target = -velocidadAproximacion - (maximo - umbralDistancia)
+			    	motor.right.target = velocidadAproximacion - (maximo - umbralDistancia)
+			 	
+			 	#No hay robots
+			  	else
+			    	#Anda de frente
+			   		 motor.left.target = velocidadAproximacion
+			    	motor.right.target = velocidadAproximacion
+			  	end
+		  	
+		  end
+	  
+	 end
+
+]]></node>
+
+
+<!--node -->
+<node name=""><![CDATA[#SEGUIDOR
+
+# Definimos el umbral de distancia con el obstaculo y con los demas robots
+var umbralObstaculo = 3500
+#Definimos el umbral por el cual se debe aproximar a otro robots
+var umbralAproximacion = 10
+#Definimos el umbral de la distancia a la que debe mantenerse el robot con los demas
+var umbralDistancia = 2000   
+# Parametros de velocidad de aproximacion
+var velocidadAproximacion =300
+#Definimos un margen de error en la distancia que se alcanza en la estabilidad
+var margen=100
+#La velocidadEstabilidad sera la que este emitiendo el lider con el evento definido
+var velocidadEstabilidad= event.args[0]
+#Creamos una variable donde guardar los valores maximo
+var maximo=0
+
+# Manejador de eventos para la deteccion de obstaculos y agrupamiento
+# Primero evitara obstaculos (OBSTACULOS) luego vera si debe mantenerse a una distancia con el lider (EQUILIBRIO) y por ultimo si debe acercarse (APROXIMACION)
+onevent prox
+		call leds.top(32,0,0)
+	  #OBSTACULOS
+	  	# Revisamos si hay un obstaculo detras (sensor 5 y 6)
+	  	if prox.horizontal[5] > umbralObstaculo or prox.horizontal[6] >umbralObstaculo then
+	    	# Nos alejamos de el avanzando hacia adelante (ambos positivos)
+	    	motor.left.target = 300
+	   		motor.right.target = 300
+	    
+	  	# Revisamos si hay un obstaculo a la derecha (sensor 3 y 4)
+	 	elseif prox.horizontal[3] > umbralObstaculo or prox.horizontal[4] > umbralObstaculo then
+	    	# Nos alejamos de el girando a la izquierda (izq negativo y der positivo)
+	   		 motor.left.target = -500
+	   		 motor.right.target = 300
+	    
+	  	# Revisamos si hay un obstaculo a la izquierda (sensor 0 y 1)
+	  	elseif prox.horizontal[1] > umbralObstaculo or prox.horizontal[0]> umbralObstaculo then
+	    	# Nos alejamos de el girando a la derecha (izq positivo y der negativo)
+	    	motor.left.target = 300
+	    	motor.right.target = -500
+	   	
+	   	else
+	   		call leds.top(0,32,0)
+			#ESTABILIDAD
+			#Distancia deseada delante (sensor 2)
+			if (umbralDistancia+margen<=prox.horizontal[2] and prox.horizontal[2]>=umbralDistancia+margen) then
+			    # Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    motor.left.target = velocidadEstabilidad - (prox.horizontal[2] - umbralDistancia)
+			    motor.right.target = velocidadEstabilidad - (prox.horizontal[2] - umbralDistancia)
+			 
+			 #*
+			 #Distancia deseada lado derecho 
+			 elseif  (umbralDistancia<=prox.horizontal[3]+margen and prox.horizontal[3]>=umbralDistancia+margen)or
+			 (umbralDistancia<=prox.horizontal[4]+margen and prox.horizontal[4]>=umbralDistancia+margen) then
+			 	#Miramos porque sensor esta mas cercano
+			 	call math.max(maximo,prox.horizontal[3],prox.horizontal[4])
+			    # Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    motor.left.target = velocidadEstabilidad - (maximo - umbralDistancia)
+			    motor.right.target = -velocidadEstabilidad - (maximo - umbralDistancia)
+			    
+			 #Distancia deseada lado izquiedo
+			 elseif  (umbralDistancia<=prox.horizontal[3]+margen and prox.horizontal[3]>=umbralDistancia+margen)or
+			 (umbralDistancia<=prox.horizontal[4]+margen and prox.horizontal[4]>=umbralDistancia+margen) then
+			 	 #Miramos porque sensor esta mas cercano
+			 	call math.max(maximo,prox.horizontal[0],prox.horizontal[1])
+			    # Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    motor.left.target = -velocidadEstabilidad - (maximo - umbralDistancia)
+			    motor.right.target = velocidadEstabilidad - (maximo - umbralDistancia)
+			*#
+		
+		    else
+	   			call leds.top(0,0,32)
+		        #APROXIMACION
+				#Robot delante (sensor 2)
+			  	if prox.horizontal[2] > umbralAproximacion then	    
+			    	# Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			   		motor.left.target = velocidadAproximacion - (prox.horizontal[2] - umbralDistancia)
+			    	motor.right.target = velocidadAproximacion - (prox.horizontal[2] - umbralDistancia)
+			    
+				#Robot derecha (sensor 3 y 4)
+			   	elseif prox.horizontal[3] > umbralAproximacion or prox.horizontal[4] > umbralAproximacion  then
+			    	#Miramos porque sensor esta mas cercano
+			 		call math.max(maximo,prox.horizontal[3],prox.horizontal[4])
+			    	# Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    	motor.left.target = velocidadAproximacion - (maximo - umbralDistancia)
+			    	motor.right.target = -velocidadAproximacion - (maximo - umbralDistancia)
+			    	
+				#Robot izquierda (sensor 0 y 1)
+			   	elseif prox.horizontal[0] > umbralAproximacion or prox.horizontal[1] > umbralAproximacion  then
+			 	 	#Miramos porque sensor esta mas cercano
+			 		call math.max(maximo,prox.horizontal[0],prox.horizontal[1])
+			    	# Ajustar la velocidad de aproximacion basada en la diferencia de distancia
+			    	motor.left.target = -velocidadAproximacion - (maximo - umbralDistancia)
+			    	motor.right.target = velocidadAproximacion - (maximo - umbralDistancia)
+			 	
+			 	#No hay robots
+			  	else
+			    	#Anda de frente
+			   		 motor.left.target = velocidadAproximacion
+			    	motor.right.target = velocidadAproximacion
+			  	end
+		  	
+		  end
+	  
+	 end
+
+]]></node>
+
+
+</network>

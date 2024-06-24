@@ -1,0 +1,70 @@
+<!DOCTYPE aesl-source>
+<network>
+
+
+<!--list of global events-->
+<constant name="UMB_OBST" value="3500"/>
+<constant name="VEL" value="200"/>
+
+
+<!--node Explorador1 en Lidi - 12528-->
+<node name="Explorador1 en Lidi - 12528" nodeId="{3ab61a3f-929a-4a30-8f1e-3637916dafcf}"><![CDATA[#Inicialización de la variable aleatorio y el temporizador
+var random_turn =0  
+timer.period[0]=1000
+
+# Evento de proximidad
+onevent prox
+#OBSTÁCULOS
+	#Revismos si hay delante (sensor 3) y damos marcha atrás
+	if   prox.horizontal[3]> UMB_OBST then
+		call leds.top(32,0,0)
+		motor.left.target = -VEL
+   		motor.right.target = -VEL
+   		
+	# Revisamos si hay un obstaculo detras (sensor 5 y 6)
+  	elseif prox.horizontal[5] > UMB_OBST or prox.horizontal[6] > UMB_OBST then
+  		call leds.top(32,0,0)
+    	# Nos alejamos de el avanzando hacia adelante (ambos positivos)
+    	motor.left.target = VEL
+   		motor.right.target = VEL
+    
+  	# Revisamos si hay un obstaculo a la derecha (sensor 3 y 4)
+ 	elseif prox.horizontal[3] > UMB_OBST or prox.horizontal[4] > UMB_OBST then
+ 		call leds.top(32,0,0)
+    	# Nos alejamos de el girando a la izquierda (izq negativo y der positivo)
+   		 motor.left.target = -500
+   		 motor.right.target = VEL
+    
+  	# Revisamos si hay un obstaculo a la izquierda (sensor 0 y 1)
+  	elseif prox.horizontal[1] > UMB_OBST or prox.horizontal[0]> UMB_OBST then
+  		call leds.top(32,0,0)
+    	# Nos alejamos de el girando a la derecha (izq positivo y der negativo)
+    	motor.left.target = VEL
+    	motor.right.target = -500
+    	
+    #Sino hay obstáculos llamamos a la subrutima explora
+	else
+	  	call leds.top(32,32,32)
+	    callsub explora
+	end
+	  
+sub explora 
+	#Si el valor es positivo avanzamos girando levemente a la derecha
+	if random_turn >0 then
+	     	motor.left.target = VEL
+	    	motor.right.target = VEL / 2  # Gira a la derecha
+	 #Si el valor es negativo avanza girando levemente a la izquierda
+	 else
+	   		 motor.left.target  = VEL / 2
+	     	motor.right.target= VEL  # Gira a la izquierda
+	 end
+
+#Cuando se acaba el temporizador se calcula un nuevo valor aleatorio
+onevent timer0
+	 call math.rand(random_turn)
+  
+
+]]></node>
+
+
+</network>
