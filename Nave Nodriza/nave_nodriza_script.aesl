@@ -3,29 +3,28 @@
 
 
 <!--list of global events-->
-<event size="1" name="cluster_encontrados"/>
-<event size="1" name="estado"/>
-<constant value="100" name="SIGMA"/>
-<constant value="2000" name="TIME_DETECT"/>
-<constant value="100" name="UMB_CLUST"/>
-<constant value="990" name="UMB_NAVE"/>
-<constant value="3000" name="UMB_OBST"/>
-<constant value="200" name="VEL"/>
+<event name="cluster_encontrados" size="1"/>
+<event name="estado" size="1"/>
+<constant name="TIME_DETECT" value="2000"/>
+<constant name="UMB_CLUST" value="200"/>
+<constant name="UMB_NAVE" value="940"/>
+<constant name="UMB_OBST" value="3000"/>
+<constant name="VEL" value="300"/>
 
 
-<!--node Dispositivo serie USB-->
-<node nodeId="{0513d492-3fe7-4c30-a907-246f62ecf569}" name="Dispositivo serie USB"><![CDATA[var left
-var right
-var mini = 1024
-var maxi = 0
-var mean = 512
-var vari = 512
-var p1
-var ndev
-var ireg = 0
-var preg
-var pcoeff = 60
-var icoeff = 33
+<!--node -->
+<node name=""><![CDATA[var black_level = 500
+var white_level = 800
+var s[2]
+var dir
+var STATE_BLACK=0
+var STATE_WHITE=1
+var DIR_LEFT=-1
+var DIR_L_LEFT=-2
+var DIR_RIGHT=1
+ var DIR_L_RIGHT=2
+var DIR_LOST=10
+var DIR_FRONT=0
 
 var accTampon0[4] = 0, 0, 0, 0
 var accTamponPos0 = 0
@@ -33,9 +32,12 @@ var accTampon1[4] = 0, 0, 0, 0
 var accTamponPos1 = 0
 var sumacc0
 var sumacc1
+var tiempo_avance = 75  # Tiempo en milisegundos para avanzar
+var tiempo_retroceso = 50  # Tiempo en milisegundos para retroceder
+var tiempo_transcurrido = 0  # Tiempo transcurrido desde el último cambio de estado
+var estado_volver=0
 
 var state_recolecta=0
-var exploring=1
 var state=0	#Variable para ver que estado tocaría ahora (3=volver,2=seguir,1=recolectar,0=explorar)
 
 var encontrados=0 #Numero de cluster encontrados (inicializado a 0)
@@ -76,18 +78,7 @@ onevent prox
 	  	end
   end
   
-  
-sub statistics
-	  call math.max(maxi, maxi, p1)
-	  call math.min(mini, mini, p1)
-	  if maxi - mini > 400 then
-	    call math.muldiv(vari, 45, maxi - mini, 100)
-	    mean = (mini + maxi) / 2
-	  end
 
-sub set_motor
-	  motor.left.target = left
-	  motor.right.target = right
 	  
 sub explora 
 	#Si el valor es positivo avanzamos girando levemente a la derecha
@@ -100,18 +91,17 @@ sub explora
 	     	motor.right.target= VEL  # Gira a la izquierda
 	 end
 
-  
 sub volver
 	#Si hemos detectado que ya hemos llegado nos ponemos a explorar
-	if prox.ground.delta[0]>UMB_NAVE and prox.ground.delta[1]> UMB_NAVE then
+	if prox.ground.delta[0]>UMB_NAVE or prox.ground.delta[1]> UMB_NAVE then
 		state=0
 	#Si aún no hemos llegado
 	else
-		accTampon0[accTamponPos0] = acc[0]-2  # Medir inclinación lateral
+		accTampon0[accTamponPos0] = acc[0]-2  # Medir inclinacion lateral
   		accTamponPos0 = (accTamponPos0 + 1) % 4
 	  	sumacc0 = accTampon0[0] + accTampon0[1] + accTampon0[2] + accTampon0[3]	
 	
-	  	accTampon1[accTamponPos1] = acc[1]     # Medir inclinación frontal
+	  	accTampon1[accTamponPos1] = acc[1]     # Medir inclinacion frontal
 	  	accTamponPos1 = (accTamponPos1 + 1) % 4
 	  	sumacc1 = accTampon1[0] + accTampon1[1] + accTampon1[2] + accTampon1[3]
 	
@@ -119,10 +109,65 @@ sub volver
 	    motor.right.target = -sumacc0 * 15 + sumacc1 * 15
    	end
    	
-   	
+sub sigue 
+	#Line Follower
+	if prox.ground.delta[0] <= black_level then
+		s[0] = STATE_BLACK
+	end
+	if prox.ground.delta[0] > white_level  then
+		s[0] = STATE_WHITE
+	end
+	
+	if prox.ground.delta[1] <= black_level then
+		s[1] = STATE_BLACK
+	end
+	if prox.ground.delta[1] > white_level then
+		s[1] = STATE_WHITE
+	end
+	
+	
+	if s[0] == STATE_BLACK and s[1] == STATE_BLACK then
+		call leds.top(32,0,32)
+		# Black line right under us
+		dir = DIR_FRONT
+	elseif s[0] == STATE_WHITE and s[1] == STATE_BLACK then
+		call leds.top(32,0,32)
+		dir = DIR_RIGHT
+	elseif s[1] == STATE_WHITE and s[0] == STATE_BLACK then
+		call leds.top(32,0,32)
+		dir = DIR_LEFT
+	else 
+		call leds.top(32,32,32)
+		dir = DIR_LOST
+	end
+	
+	if dir == DIR_FRONT then
+		motor.left.target = VEL
+		motor.right.target = VEL
+		call leds.circle(32,0,0,0,32,0,0,0)
+	elseif dir == DIR_RIGHT then
+		motor.left.target = VEL
+		motor.right.target = 0
+		call leds.circle(0,32,0,32,0,0,0,0)
+	elseif dir == DIR_LEFT then
+		motor.left.target = 0
+		motor.right.target = VEL
+		call leds.circle(0,0,0,0,0,32,0,32)
+	elseif dir == DIR_L_LEFT then
+		motor.left.target = -VEL
+		motor.right.target = VEL
+		call leds.circle(0,0,0,0,0,0,32,0)
+	elseif dir == DIR_L_RIGHT then
+		motor.left.target = VEL
+		motor.right.target = -VEL
+		call leds.circle(0,0,32,0,0,0,0,0)
+	elseif dir == DIR_LOST then
+		callsub explora
+	end
+	
 sub recolecta
 		#DETECCIÓN DE CLUSTER
-		if prox.ground.delta[0] < UMB_CLUST or prox.ground.delta[1] < UMB_CLUST then
+		if prox.ground.reflected[0] < UMB_CLUST or prox.ground.reflected[1] < UMB_CLUST then
 		 	call leds.top(0, 0, 32)  #Indicar con LEDs que se ha detectado un posible clúster
 		 	motor.right.target = -VEL
 		    #Debe avanzar (state_recolecta=1)
@@ -138,59 +183,24 @@ sub recolecta
 	        
 	    #NO HAY DETECCIÓN DE CLUSTER 
 		 else	    	
-			#Y estamos explorando
-	  		if exploring == 1 then
-	  			call leds.top(32,32,32)
-	    		callsub explora
-	  
-	  		#Si no estamos explorando
-	  		else  
-		    	p1 = prox.ground.delta[1]
-		    	callsub statistics
-		    	call math.muldiv(ndev, SIGMA, p1 - mean, vari)
-		    	
-				if abs(ndev) < SIGMA then
-					call leds.top(32,0,32)
-			      	preg = (pcoeff * ndev) / 100
-			     	ireg += (icoeff * preg) / 100
-			      	left = VEL + (preg + ireg)
-			     	right = VEL - (preg + ireg)
-				else
-			      	call leds.top(32, 0, 32)
-			     	 ireg = 0
-			      	left = ndev
-			      	right = -ndev
-			 	end
-		   		callsub set_motor
+			callsub sigue	
 	  	end
-  
-	 	# Si detecta una línea, cambia a modo de seguimiento
-	 	if  prox.ground.delta[0] < mean - SIGMA or prox.ground.delta[1] < mean - SIGMA then
-	    	exploring = 0
-	  	else
-	    	# Si no detecta una línea durante el seguimiento, vuelve a explorar
-	    	if exploring == 0 and abs(ndev) >= SIGMA then
-	      		exploring = 1
-	  		end
-  		end
-    end
+	  	
      
 #Si se acabo el temporizador
  onevent timer0
  	#Volvemos a calcular el valor aleatorio y emitimos el estado
  	call math.rand(random_turn)
- 	emit estado(state_recolecta)
  	
 	#Si ha terminado el temporizador y estaba avanzando le decimos que de vueltas
 	 if  state_recolecta==1 then
 	 	#Si aún está encima del clúster, 
 	 	
-	 	if prox.ground.delta[0] < UMB_CLUST and prox.ground.delta[1] < UMB_CLUST then
+	 	if prox.ground.reflected[0] < UMB_CLUST and prox.ground.reflected[1] < UMB_CLUST then
 	 		call leds.top(0,32,0)	#Indicamos con los leds que lo encontramos
 	 		encontrados=encontrados+1
 	 		emit cluster_encontrados(encontrados)	#Emitimos los que llevamos encontrados
 	 		state=4
-	 		exploring=1
 	 		
 	 	end
 	 	timer.period[0]=1000
